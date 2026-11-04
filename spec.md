@@ -1,6 +1,6 @@
 ---
 title: Mega-Cap Event Radar · ปฏิทินเหตุการณ์และผลกระทบงบต่อหุ้น Top 50 สหรัฐฯ
-owner: [ชื่อเล่น]
+owner: ต๊ะ
 status: draft
 updated: 2026-11-04
 ---
