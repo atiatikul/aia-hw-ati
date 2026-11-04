@@ -130,3 +130,22 @@ edit the item 2 (earning spillover) to include the explanation of the earning re
   - เติมตัวเลขที่ยังขาด
   - รันใหม่หลังวันที่ 4 พ.ย. ปิดตลาด เพื่อเก็บปฏิกิริยาของ AMD และ AMGN
   - เขียน `help.md` และใส่ธีมกลุ่มใน README
+
+---
+
+## รอบ 5 · 2026-11-04
+
+- **ทำอะไร:** เตรียมให้ผู้สอนเปิด dashboard จากลิงก์เดียวด้วย GitHub Pages: ตรวจว่า `output/dashboard.html` ฝังข้อมูลครบและไม่พึ่งไฟล์ในเครื่อง, สร้าง `index.html` ที่รากของ repo (สำเนาเดียวกับ dashboard), เพิ่ม `.nojekyll` ว่าง และแก้ `scripts/build_dashboard.py` ให้เขียน `index.html` พร้อม `output/dashboard.html` ทุกครั้ง
+- **เครื่องมือ / model:** Claude Desktop แท็บ Code · Claude Sonnet 5.5
+- **Prompt ที่ใช้:**
+
+```text
+ช่วยทำให้ผู้สอนเปิดดูผลงานใน repo นี้ได้จากลิงก์เดียว โดยไม่ต้อง clone ไม่ต้องติดตั้ง ไม่ต้องล็อกอิน ทำทีละข้อ และถามฉันก่อนทุกครั้งที่ต้องตัดสินใจ
+1) หาไฟล์ผลงานหลัก (เช่น output/*.html) แล้วตรวจว่าเปิดได้โดยไม่พึ่ง path ในเครื่องฉัน ...
+2) สอนฉันเปิด GitHub Pages ทีละขั้น ... และเพิ่มไฟล์ว่างชื่อ .nojekyll ไว้บนสุดของ repo
+3) เสร็จแล้วพิมพ์ /save
+```
+
+- **ผลที่ได้:** ไฟล์พร้อมให้ Pages เสิร์ฟที่ https://atiatikul.github.io/aia-hw-ati/ ยังขาด: ต้องให้ผู้เรียนเปิด Pages เองใน Settings (AI ตั้งค่าให้ไม่ได้) และทดสอบลิงก์ใน incognito
+- **ตัดสินใจอะไร และเพราะอะไร:** ผู้เรียนเลือกคัดลอก dashboard เป็น `index.html` ที่ราก เพื่อให้ลิงก์สั้นเป็นลิงก์เดียว (ไม่ใช้ redirect) และเลือกคงฟอนต์ Google Fonts ไว้ เพราะมีฟอนต์สำรองของระบบอยู่แล้ว [ผู้เรียนไม่ได้ระบุเหตุผลเพิ่ม]
+- **ขั้นต่อไป:** เปิด Pages (Settings → Pages → main → / root), ทดสอบลิงก์ใน incognito, ใส่ลิงก์ Pages ใน README, ใส่ธีมกลุ่ม และเขียน `help.md`

@@ -65,6 +65,7 @@ def main():
             '<style>body{margin:0}[hidden]{display:none!important}</style>\n</head>\n<body>\n'
             + html + '\n</body>\n</html>\n')
     open("output/dashboard.html", "w", encoding="utf-8").write(full)
+    open("index.html", "w", encoding="utf-8").write(full)  # GitHub Pages entry: https://atiatikul.github.io/aia-hw-ati/
     print("output/dashboard.html", round(len(full) / 1024), "KB")
 
 
