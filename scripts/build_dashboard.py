@@ -22,6 +22,10 @@ def main():
     pairs = read("output/data/spillover.csv")
     ev_rows = read("output/data/spillover_events.csv")
     reps = read("output/data/spillover_reporters.csv")
+    results = json.load(open("output/data/earnings_results.json", encoding="utf-8"))["results"]
+    for item in json.load(open("work/results_todo.json")):  # latest 8-K per reporter
+        if item["t"] in results:
+            results[item["t"]].update(url=item["url"], released=item["accepted_et"])
 
     quarters = defaultdict(dict)
     for r in ev_rows:
@@ -48,6 +52,7 @@ def main():
         "reporters": [{"t": r["reporter"], "status": r["status"], "date": r["date"], "n": int(r["n_quarters"]),
                        "latestDay": r["latest_reaction_day"], "latest": num(r["latest_excess_pct"]),
                        "peers": int(r["n_peers"]), "avgAbs": num(r["avg_abs_excess_pct"]), "note": r["note"]} for r in reps],
+        "results": results,
         "quarters": {k: sorted(v.values(), key=lambda q: q["day"]) for k, v in quarters.items()},
     }
     tpl = open("scripts/dashboard_template.html", encoding="utf-8").read()

@@ -123,6 +123,15 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; font-size: 0
 .reps button .up { color: var(--pos); } .reps button .dn { color: var(--neg); }
 .repgroup { display: flex; flex-direction: column; gap: 6px; }
 #latest-card .chart { max-width: 760px; }
+.result { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px 20px; padding-bottom: 12px; border-bottom: 1px solid var(--line-2); }
+.result .headline { font-size: 1rem; font-weight: 500; max-width: 62ch; }
+.figs { display: flex; flex-wrap: wrap; gap: 6px; }
+.fig { display: flex; flex-direction: column; gap: 1px; padding: 6px 9px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line-2); min-width: 0; }
+.fig span { font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.fig b { font: 500 0.85rem var(--f-mono); }
+.readout { display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
+.readout p { max-width: 60ch; }
+@media (max-width: 860px) { .result { grid-template-columns: minmax(0, 1fr); } }
 .sp-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 16px; align-items: start; }
 .card { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .rep-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline; }
@@ -236,6 +245,8 @@ tbody tr:hover, tbody tr.sel { background: var(--line-2); }
         <ol>
           <li><b>Universe.</b> The 50 largest US-listed common stocks of US companies on NYSE/NASDAQ by TradingView market cap on the snapshot date. OTC foreign listings, preferred/depositary shares and second share classes (GOOG, BRK.A) are dropped.</li>
           <li><b>Reporters.</b> Two groups: top-50 companies whose next earnings date falls in the 2-month window, and those whose latest results (EDGAR 8-K) came out in the 31 days before the snapshot. For a company that just reported, the "Latest result" card shows each peer's move on that result's reaction day.</li>
+          <li><b>What the company reported.</b> For each reporter, the latest earnings press release (8-K exhibit 99.1 on EDGAR) was read. Headline figures are copied from it, and the one-line summary and outlook are short paraphrases. Analyst consensus is not in the allowed sources, so the page does not call a result a beat or a miss unless the company itself says so.</li>
+          <li><b>How to read the reaction.</b> Rules applied to the measured moves: the own move vs SPY is compared with the stock's average report-day move over the 8 quarters: at least 1.5 times the average is "bigger than usual", 0.6 times or less is "smaller than usual". If at least 70% of same-sector peers moved the same way, the result is read as sector-wide news. At 30% or less it looks company-specific, possibly with money rotating into peers. Anything between is "mostly company-specific".</li>
           <li><b>Peers.</b> The other top-50 names in the same TradingView sector. "Same industry" is flagged in the table as the closer business match.</li>
           <li><b>Past release times.</b> The reporter's last 8 SEC EDGAR 8-K filings with Item 2.02 (Results of Operations). The filing's acceptance time tells whether results came before the open or after the close. When two such filings are less than 50 days apart, only the later one (the full results release) is kept, so pre-announcements and mid-quarter updates drop out. Banks file many 8-Ks, so their history is read from EDGAR's older filing pages too. ExxonMobil changed to a new holding-company CIK in 2026, so its older releases come from the previous CIK (34088). Berkshire publishes on Saturdays, so its reaction day is the following Monday.</li>
           <li><b>Reaction day.</b> After the close (AMC) means the next trading day; before the open (BMO) or intraday means the same day.</li>
@@ -390,19 +401,55 @@ function selectRep(t, p) {
   renderLatest(); renderCorr(); renderDetail(); renderTable();
 }
 
+// plain-language reading of one result: what the company said, how its stock and its peers reacted
+function resultBlock(rep, ps) {
+  const r = R[rep], res = D.results[rep];
+  if (!res) return "";
+  const pending = r.status === "reported" && !justReported(rep);
+  const linked = ps.filter(p => p.link === "Strong" || p.link === "Moderate");
+  let read;
+  if (pending) read = `<p>The stock's reaction day (the trading day after this release) had not closed at the snapshot, so the market reaction is not measured yet.</p>`;
+  else if (r.latest == null) read = `<p>No closing prices were saved for this stock, so the reaction is not measured.</p>`;
+  else {
+    const size = Math.abs(r.latest);
+    const ratio = r.avgAbs ? size / r.avgAbs : null;
+    const strength = ratio == null ? "" : ratio >= 1.5 ? "a bigger move than usual" : ratio <= 0.6 ? "a smaller move than usual" : "about its usual size";
+    read = `<p><b>Own stock:</b> ${esc(rep)} ${r.latest >= 0 ? "beat" : "lagged"} the market by ${size.toFixed(1)}% on ${esc(r.latestDay)}${strength ? `, ${strength} (its average report-day move is ±${r.avgAbs.toFixed(1)}%)` : ""}.</p>`;
+    if (ps.length) {
+      const same = ps.filter(p => (p.latest > 0) === (r.latest > 0)).length, share = same / ps.length;
+      const verdict = share >= 0.7 ? "Investors read it as news for the whole group (sector-wide read-through)."
+        : share <= 0.3 ? "Most peers moved the other way, so the news looked specific to the company, and money may have rotated into its peers."
+        : "Peers were split, so the result was treated mostly as company-specific.";
+      read += `<p><b>Peers:</b> ${same} of ${ps.length} same-sector peers moved in the same direction. ${verdict}</p>`;
+      if (linked.length) read += `<p><b>Historically linked peers:</b> ${linked.map(p => `${esc(p.peer)} ${sgn(p.latest)}%`).join(", ")}. ${linked.every(p => (p.latest > 0) === (r.latest > 0)) ? "They followed the usual pattern." : "At least one broke its usual pattern this time."}</p>`;
+    }
+  }
+  return `<div class="result">
+      <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <div class="eyebrow">What the company reported · ${esc(res.q)} · released ${esc(res.released)} ET</div>
+        <p class="headline">${esc(res.headline)}</p>
+        ${res.figs.length ? `<div class="figs">${res.figs.map(([k, v]) => `<div class="fig"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>` : `<p class="small muted">Headline figures were not extracted from this release; open the press release for the numbers.</p>`}
+        ${res.outlook ? `<p class="small"><b>Outlook:</b> ${esc(res.outlook)}</p>` : ""}
+        <p class="small muted">Source: <a href="${esc(res.url)}" target="_blank" rel="noopener">SEC EDGAR 8-K, exhibit 99.1 press release</a> · accessed ${D.asof} · consensus estimates are not in the allowed sources, so beat/miss vs analysts is not judged</p>
+      </div>
+      <div class="readout"><div class="eyebrow">How to read the reaction</div>${read}</div>
+    </div>`;
+}
+
 function renderLatest() {
   const r = R[rep], u = uni[rep];
   const ps = D.pairs.filter(x => x.rep === rep && x.latest != null).sort((a, b) => b.latest - a.latest);
+  const rb = resultBlock(rep, ps);
   const head = justReported(rep) ? "Latest result" : r.status === "reported" ? `Previous result (the ${fmtD(r.date)} result has no closing price yet)` : "Previous result";
-  if (!r.peers) { $("#latest-card").innerHTML = `<div class="rep-head"><h2>${esc(rep)} <span class="muted" style="font-weight:500;font-size:1rem">${esc(u.company)}</span></h2></div><p class="muted">No other top-50 company is in its sector (${esc(u.sector)}), so there is no peer spillover to measure.${r.latest != null ? ` Its own move on the latest reaction day (${r.latestDay}) was ${sgn(r.latest)}% vs SPY.` : ""}${r.n ? "" : " Price history for it was not saved in this run."}</p>`; return; }
-  if (!ps.length) { $("#latest-card").innerHTML = `<div class="rep-head"><div><div class="eyebrow">${head}</div><h2>${esc(rep)} reported ${fmtDY(r.date)}</h2></div></div><p class="muted">The reaction day has no closing price yet (${esc(r.note)}). The 8-quarter history below excludes this report.</p>`; return; }
+  if (!r.peers) { $("#latest-card").innerHTML = `<div class="rep-head"><h2>${esc(rep)} <span class="muted" style="font-weight:500;font-size:1rem">${esc(u.company)}</span></h2></div>${rb}<p class="muted">No other top-50 company is in its sector (${esc(u.sector)}), so there is no peer spillover to measure.${r.latest != null ? ` Its own move on the latest reaction day (${r.latestDay}) was ${sgn(r.latest)}% vs SPY.` : ""}${r.n ? "" : " Price history for it was not saved in this run."}</p>`; return; }
+  if (!ps.length) { $("#latest-card").innerHTML = `<div class="rep-head"><div><div class="eyebrow">${head}</div><h2>${esc(rep)} reported ${fmtDY(r.date)}</h2></div></div>${rb}<p class="muted">The reaction day has no closing price yet (${esc(r.note)}). The 8-quarter history below excludes this report.</p>`; return; }
   const rows = [{ peer: rep, latest: r.latest, self: true }, ...ps];
   const lim = Math.max(2, Math.ceil(Math.max(...rows.map(x => Math.abs(x.latest))) / 2) * 2);
   const W = 560, rowH = 24, top = 22, left = 56, right = 64, H = top + rows.length * rowH + 6;
   const x = v => left + (v + lim) / (2 * lim) * (W - left - right);
   const step = lim <= 4 ? 1 : lim <= 10 ? 2 : lim <= 20 ? 5 : 10;
   let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Each peer's excess move on ${esc(rep)}'s latest reaction day">`;
-  for (let v = -lim; v <= lim + 1e-9; v += step) svg += `<line class="${v === 0 ? "zero" : "grid"}" x1="${x(v)}" x2="${x(v)}" y1="${top - 6}" y2="${H - 4}"/><text x="${x(v)}" y="12" text-anchor="middle">${v > 0 ? "+" : ""}${v}%</text>`;
+  for (let v = -Math.floor(lim / step) * step; v <= lim + 1e-9; v += step) svg += `<line class="${v === 0 ? "zero" : "grid"}" x1="${x(v)}" x2="${x(v)}" y1="${top - 6}" y2="${H - 4}"/><text x="${x(v)}" y="12" text-anchor="middle">${v > 0 ? "+" : ""}${v}%</text>`;
   rows.forEach((p, i) => {
     const y = top + i * rowH, x0 = x(0), x1 = x(p.latest), w = Math.max(Math.abs(x1 - x0), 1.5), bx = Math.min(x0, x1), r4 = Math.min(4, w), h = 12, yy = y + (rowH - h) / 2;
     const col = p.self ? "var(--earn)" : "var(--macro)";
@@ -419,6 +466,7 @@ function renderLatest() {
   $("#latest-card").innerHTML = `
     <div class="rep-head"><div><div class="eyebrow">${head} · reaction day ${esc(r.latestDay)}</div><h2>${esc(rep)} ${sgn(r.latest)}% vs SPY <span class="muted" style="font-weight:500;font-size:1rem">${esc(u.company)}</span></h2></div>
       <div class="facts"><span>Peers moving the same way <b>${same} of ${ps.length}</b></span>${strongHit.length ? `<span>Linked peers (Strong/Moderate) <b>${strongHit.map(p => `${esc(p.peer)} ${sgn(p.latest)}%`).join(", ")}</b></span>` : ""}</div></div>
+    ${rb}
     <div class="legend"><span><i style="background:var(--earn)"></i>${esc(rep)} own move</span><span><i style="background:var(--macro)"></i>same-sector peers</span><span>excess return vs SPY on that day</span></div>
     ${svg}
     ${r.note ? `<p class="small muted">${esc(r.note)}</p>` : ""}`;
@@ -478,7 +526,7 @@ function renderDetail() {
   const gw = (W - left - right) / qs.length, bw = Math.min(16, gw / 3);
   let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(rep)} and ${esc(peer)} excess moves on each reaction day">`;
   const step = lim <= 4 ? 1 : lim <= 10 ? 2 : lim <= 20 ? 5 : 10;
-  for (let v = -lim; v <= lim + 1e-9; v += step) svg += `<line class="${v === 0 ? "zero" : "grid"}" x1="${left}" x2="${W - right}" y1="${y(v)}" y2="${y(v)}"/><text x="${left - 6}" y="${y(v) + 4}" text-anchor="end">${v > 0 ? "+" : ""}${v}%</text>`;
+  for (let v = -Math.floor(lim / step) * step; v <= lim + 1e-9; v += step) svg += `<line class="${v === 0 ? "zero" : "grid"}" x1="${left}" x2="${W - right}" y1="${y(v)}" y2="${y(v)}"/><text x="${left - 6}" y="${y(v) + 4}" text-anchor="end">${v > 0 ? "+" : ""}${v}%</text>`;
   const bar = (cx, v, col) => {
     const y0 = y(0), y1 = y(v), h = Math.max(Math.abs(y1 - y0), 1.5), r = Math.min(4, h), bx = cx - bw / 2;
     return v >= 0
@@ -526,6 +574,7 @@ const srcList = [
   ["TradingView daily prices (MCP), closes for 49 stocks + SPY (GEV from hourly bars)", null],
   ["TradingView earnings calendar (MCP), most recent report dates (to find who reported in the past month)", null],
   ["SEC EDGAR submissions API, 8-K Item 2.02 filing times", "https://www.sec.gov/edgar/sec-api-documentation"],
+  ["SEC EDGAR 8-K exhibit 99.1 earnings press releases (linked on each result)", null],
   ["Federal Reserve FOMC calendar", "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"],
   ["BLS release schedules (CPI, PPI, jobs, JOLTS)", "https://www.bls.gov/schedule/news_release/cpi.htm"],
   ["BEA release schedule (GDP, PCE)", "https://www.bea.gov/news/schedule"],
